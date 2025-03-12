@@ -5,17 +5,17 @@
 /*
  * Configure the analog input pins to the accelerometer's 3 axes
  */
-const int X_PIN = A4;
+const int X_PIN = A2;
 const int Y_PIN = A3;
-const int Z_PIN = A2;
+const int Z_PIN = A4;
 
 /*
  * Set the "zero" states when each axis is neutral
  * NOTE: Customize this for your accelerometer sensor!
  */
-const int X_ZERO = 1850;
-const int Y_ZERO = 1850;
-const int Z_ZERO = 1950;
+const int X_ZERO = 2150; //originally 1850
+const int Y_ZERO = 2150; // originally 1850
+const int Z_ZERO = 2250; // originally 1950
 
 
 /*

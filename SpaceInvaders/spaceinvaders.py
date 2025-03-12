@@ -51,7 +51,10 @@ class Ship(sprite.Sprite):
         sprite.Sprite.__init__(self)
         self.image = IMAGES['ship']
         self.rect = self.image.get_rect(topleft=(375, 540))
-        self.speed = 15
+        self.speed = 5
+        self.controller_host = "127.0.0.1"
+        self.controller_port = 65433
+        self.controller_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def update(self, keys, *args):
         if keys[K_LEFT] and self.rect.x > 10:
@@ -374,7 +377,6 @@ class SpaceInvaders(object):
         self.life3 = Life(769, 3)
         self.livesGroup = sprite.Group(self.life1, self.life2, self.life3)
 
-
     def reset(self, score):
         self.player = Ship()
         self.playerGroup = sprite.Group(self.player)
@@ -469,48 +471,34 @@ class SpaceInvaders(object):
         try:
             msg, _ = mySocket.recvfrom(1024) # receive 1024 bytes
             msg = msg.decode('utf-8')
-            print("Received Command: " + msg)
+            print("Command: " + msg)
 
-            if msg.startswith("CMD:"): #New Command messages for data handling
-                command = msg[4:] # Decode message 
-                if command == "QUIT":
-                    sys.exit()
-                if command == "FIRE":
-                    if len(self.bullets) == 0 and self.shipAlive:
-                        if self.score < 1000:
-                            bullet = Bullet(self.player.rect.x + 23,
+            if msg == "QUIT":
+                sys.exit()
+            if msg == "FIRE":
+                if len(self.bullets) == 0 and self.shipAlive:
+                    if self.score < 1000:
+                        bullet = Bullet(self.player.rect.x + 23,
                                         self.player.rect.y + 5, -1,
                                         15, 'laser', 'center')
-                            self.bullets.add(bullet)
-                            self.allSprites.add(self.bullets)
-                            self.sounds['shoot'].play()
-                        else:
-                            leftbullet = Bullet(self.player.rect.x + 8,
+                        self.bullets.add(bullet)
+                        self.allSprites.add(self.bullets)
+                        self.sounds['shoot'].play()
+                    else:
+                        leftbullet = Bullet(self.player.rect.x + 8,
                                             self.player.rect.y + 5, -1,
                                             15, 'laser', 'left')
-                            rightbullet = Bullet(self.player.rect.x + 38,
+                        rightbullet = Bullet(self.player.rect.x + 38,
                                                 self.player.rect.y + 5, -1,
                                                 15, 'laser', 'right')
-                            self.bullets.add(leftbullet)
-                            self.bullets.add(rightbullet)
-                            self.allSprites.add(self.bullets)
-                            self.sounds['shoot2'].play()
-                elif command == "LEFT":
-                    self.player.update_udp_socket("LEFT")
-                elif command == "RIGHT":
-                    self.player.update_udp_socket("RIGHT")
-                else:
-                    print(f"[GAME] Invalid command: {command}")
-
-            elif msg.startswith("DATA:"):  # Data messages (ignore in game)
-                pass
-
-
+                        self.bullets.add(leftbullet)
+                        self.bullets.add(rightbullet)
+                        self.allSprites.add(self.bullets)
+                        self.sounds['shoot2'].play()
+            else:
+                self.player.update_udp_socket(msg)
         except BlockingIOError:
             pass # do nothing if there's no data
-
-        except Exception as e:
-            print(f"UDP Error: {e}")
     ''' ============================================================ '''
 
     def make_enemies(self):
@@ -541,11 +529,12 @@ class SpaceInvaders(object):
                   4: 10,
                   5: choice([50, 100, 150, 300])
                   }
-
+        
         score = scores[row]
         self.score += score
+        self.controller_socket.sendto(f"SCORE:{self.score}".encode(), (self.controller_host, self.controller_port))
         return score
-
+        
     def create_main_menu(self):
         self.enemy1 = IMAGES['enemy3_1']
         self.enemy1 = transform.scale(self.enemy1, (40, 40))
@@ -570,11 +559,6 @@ class SpaceInvaders(object):
             EnemyExplosion(enemy, self.explosionsGroup)
             self.gameTimer = time.get_ticks()
 
-            #Whenever enemy is hit
-            mySocket.sendto(
-            f"DATA:SCORE:{self.score}".encode('utf-8'),
-            (host, port)
-        )
         for mystery in sprite.groupcollide(self.mysteryGroup, self.bullets,
                                            True, True).keys():
             mystery.mysteryEntered.stop()
@@ -584,13 +568,6 @@ class SpaceInvaders(object):
             newShip = Mystery()
             self.allSprites.add(newShip)
             self.mysteryGroup.add(newShip)
-
-            #Whenever mystery is hit 
-            mySocket.sendto(
-            f"DATA:SCORE:{self.score}".encode('utf-8'),
-            (host, port)
-        )
-            
 
         for player in sprite.groupcollide(self.playerGroup, self.enemyBullets,
                                           True, True).keys():
@@ -603,17 +580,14 @@ class SpaceInvaders(object):
             else:
                 self.gameOver = True
                 self.startGame = False
-
-            lives = len(self.livesGroup)
-            mySocket.sendto(
-            f"DATA:LIVES:{lives}".encode('utf-8'), 
-            (host, port)
-            )
             self.sounds['shipexplosion'].play()
             ShipExplosion(player, self.explosionsGroup)
             self.makeNewShip = True
             self.shipTimer = time.get_ticks()
             self.shipAlive = False
+        
+        lives = sum([life.alive() for life in self.livesGroup])
+        self.controller_socket.sendto(f"LIVES:{lives}".encode(), (self.controller_host, self.controller_port))
 
         if self.enemies.bottom >= 540:
             sprite.groupcollide(self.enemies, self.playerGroup, True, True)
@@ -648,16 +622,11 @@ class SpaceInvaders(object):
         elif passed > 3000:
             self.mainScreen = True
 
-        mySocket.sendto(
-        f"DATA:GAMEOVER:{self.score}".encode('utf-8'),
-        (host, port)
-    )
-
         for e in event.get():
             if self.should_exit(e):
                 sys.exit()
-
         
+        self.controller_socket.sendto(f"GAMEOVER:{self.score}".encode(), (self.controller_host, self.controller_port))
 
     def main(self):
         while True:

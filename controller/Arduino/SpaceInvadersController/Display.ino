@@ -2,6 +2,7 @@
 // =========== OLED Display ============ 
 // ----------------------------------------------------------------------------------------------------
 
+
 /* 
  * OLED Display Include and Settings
  */
@@ -12,42 +13,47 @@ U8X8_SSD1306_128X32_UNIVISION_HW_I2C oled(U8X8_PIN_NONE); // instantiate the dis
 const int MAX_REFRESH = 1000;                             // limit the screen clearing to at most once per second
 unsigned long lastClear = 0;                              // the last time we updated the screen
 
-/*
- * Initialize the OLED with a fixed base font for fast refresh.
- */
 void setupDisplay() {
   oled.begin();
   oled.setPowerSave(0);
   oled.setFont(u8x8_font_amstrad_cpc_extended_r);
-  oled.setCursor(0, 0);
+  oled.clearDisplay();
 }
 
 /*
- * A function to write a message on the OLED display.
- * The "row" argument specifies which row to print on. Valid values are [0, 1, 2, 3].
- * The "erase" argument specifies if the display should be cleared first or not.
+ * Write a message on the OLED display.
  */
-void writeDisplay(const char *message, int row, bool erase) {
-  unsigned long now = millis();
-  if(erase && (millis() - lastClear >= MAX_REFRESH)) {
-    oled.clearDisplay();
-    lastClear = now;
+void writeDisplay(const char *message, int row, bool clearRow) {
+  if (clearRow) {
+    oled.clearLine(row); // Clear the specific row before writing
   }
   oled.setCursor(0, row);
   oled.print(message);
 }
 
 /*
- * A function to write a CSV (comma-separated) message on multiple lines on the OLED.
- * The commaCount argument specifies how many commas are in the String.
- * NOTE: The OLED can only display 4 lines of text (a maximum of 3 commas).
+ * Display the current score and remaining lives on the OLED.
  */
-void writeDisplayCSV(String message, int commaCount) {
-  int startIndex = 0;
-  for(int i=0; i<=commaCount; i++) {
-    int index = message.indexOf(',', startIndex);
-    String subMessage = message.substring(startIndex, index);
-    startIndex = index + 1;
-    writeDisplay(subMessage.c_str(), i, false);
-  }
+void displayScoreAndLives(int score, int lives) {
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "Sc: %d Lv: %d", score, lives); // Abbreviated labels
+  writeDisplay(buffer, 0, true); // Display on row 0 and clear the row
+}
+
+/*
+ * Display the top 3 scores on the OLED.
+ */
+void displayTopScores(int topScores[3]) {
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "Top: %d %d %d", topScores[0], topScores[1], topScores[2]);
+  writeDisplay(buffer, 1, true); // Display on row 1 and clear the row
+}
+
+/*
+ * Display the current sensitivity setting on the OLED.
+ */
+void displaySensitivity(int sensitivity) {
+  char buffer[32];
+  snprintf(buffer, sizeof(buffer), "Sens: %d", sensitivity); // Abbreviated label
+  writeDisplay(buffer, 2, true); // Display on row 2 and clear the row
 }

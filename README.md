@@ -9,7 +9,7 @@ You must have Pygame installed before being able to run the game: https://www.py
 
 # Part 1 README.md 
 
-[video of controller]() 
+[video of controller](https://youtu.be/R6F89TPE4mo) 
 
 ## Implementations of 3 improvements and 3 features
 
